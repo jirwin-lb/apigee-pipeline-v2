@@ -1,43 +1,58 @@
-name: Download and Commit API Revision
+name: Sync Proxy Github Action
+
 on:
   push:
     branches:
-      - dev # Adjust the branch name as needed
+      - dev
 
 jobs:
-  download-and-commit:
+  sync:
     runs-on: ubuntu-latest
+    permissions:
+      # Give the default GITHUB_TOKEN write permission to commit and push the
+      # added or changed files to the repository.
+      contents: write
 
     steps:
-      - name: Checkout repository
+      - name: Checkout code
         uses: actions/checkout@v2
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v2
+      - name: Checkout code from master deploy repo
+        uses: actions/checkout@v2
         with:
-          node-version: 14
-
-      - name: Install dependencies
-        run: |
-          npm install axios  # Install the 'axios' module
-          npm install adm-zip
-
-      - name: Install adm-zip
-        run: npm install adm-zip
+          repository: EDRInc/apigee-deploy-scripts
+          path: master-deploy
+          ref: refs/heads/master
 
       - name: Dotenv Action
         id: import-env
         uses: falti/dotenv-action@v1.0.2
 
-      - name: Download API revision zip
+      - name: Setup node
+        uses: actions/setup-node@v3
+        with:
+          node-version: ${{ matrix.node }}
+      - run: npm install
+          npm install -g apigeetool@0.15.1
+          npm install -g jszip
+          npm install -g file-saver --save
+          npm install adm-zip
+
+      - name: Run the script
         env:
-          ORG_NAME: 'lightbox-preprod'
-          API_NAME: ${{ steps.import-env.outputs.api_name }}
-          PROXY_REVISION: ${{ steps.import-env.outputs.proxy_revision }}
-          USERNAME: ${{ secrets.APIGEE_USERNAME }}
-          PASSWORD: ${{ secrets.APIGEE_PASSWORD }}
-        run: |
-          node download-and-commit.js "$ORG_NAME" "$API_NAME" "$PROXY_REVISION" "$USERNAME" "$PASSWORD"
+          APIGEE_USER: ${{ secrets.APIGEE_USER }}
+          APIGEE_PASSWORD: ${{ secrets.APIGEE_PASSWORD }}
+          APIGEE_ORGANIZATION: 'lightbox-preprod'
+          APIGEE_ENVIRONMENT: 'dev'
+          PROXY_NAME: ${{steps.import-env.outputs.proxy_name}}
+          PROXY_REVISION: ${{steps.import-env.outputs.proxy_revision}}
+        run: node master-deploy/deploy/sync.js
+
+      # - name: Git Auto Commit
+      #   uses: stefanzweifel/git-auto-commit-action@v4.16.0
+      #   with:
+      #     file_pattern: '*.zip *.tf'
+      #     commit_message: Sync Proxy
 
       - name: Commit changes
         run: |
