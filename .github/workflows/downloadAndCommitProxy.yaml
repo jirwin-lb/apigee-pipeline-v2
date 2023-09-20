@@ -1,0 +1,46 @@
+name: Download and Commit API Revision
+on:
+  push:
+    branches:
+      - dev # Adjust the branch name as needed
+
+jobs:
+  download-and-commit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v2
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v2
+        with:
+          node-version: 14
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Install adm-zip
+        run: npm install adm-zip
+
+      - name: Dotenv Action
+        id: import-env
+        uses: falti/dotenv-action@v1.0.2
+
+      - name: Download API revision zip
+        env:
+          ORG_NAME: 'lightbox-preprod'
+          API_NAME: ${{ steps.import-env.outputs.api_name }}
+          PROXY_REVISION: ${{ steps.import-env.outputs.proxy_revision }}
+          USERNAME: ${{ secrets.APIGEE_USERNAME }}
+          PASSWORD: ${{ secrets.APIGEE_PASSWORD }}
+        run: |
+          node download-and-commit.js "$ORG_NAME" "$API_NAME" "$PROXY_REVISION" "$USERNAME" "$PASSWORD"
+
+      - name: Commit changes
+        run: |
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git add .
+          git commit -m "Add API revision"
+          git push
